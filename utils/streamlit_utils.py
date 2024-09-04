@@ -16,6 +16,9 @@ import shutil
 import uuid
 from langchain_community.chat_message_histories import StreamlitChatMessageHistory
 import plotly.express as px
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
 
 
 
@@ -352,6 +355,8 @@ def query_func():
 
 def chat_func():
 
+    title_func()
+
     AI_AVATAR = "images/gprMax_FB_logo.png"
 
     # os.environ["OPENAI_API_KEY"] = st.session_state["openai_api_key"]
@@ -533,5 +538,120 @@ def streamlit_validate_ft_format(data_path):
     else:
         # print("No errors found")
         return True
+
+def input_func():
+    st.title("Input file generation")
+
+    AI_AVATAR = "images/gprMax_FB_logo.png"
+
+    # os.environ["OPENAI_API_KEY"] = st.session_state["openai_api_key"]
+    # st.session_state["project"] = st.text_input("Project here")
+
+    chat_model = "ft:gpt-4o-mini-2024-07-18:personal::A3Xj55I8"
+
+    st.session_state["query_project"] = "af6c69d5"
+
+    for msg in history.messages:
+        avatar = AI_AVATAR if msg.type == "ai" else None
+        st.chat_message(msg.type, avatar=avatar).write(msg.content)
+
+    if len(history.messages) == 0:
+        with st.chat_message("assistant", avatar=AI_AVATAR):
+            st.write("Ask away!")
+        history.add_ai_message("Ask away")
+
+    streamlit_prompt = st.chat_input("Request input file for generation")
+
+
+    if streamlit_prompt:
+        if st.session_state["openai_api_key"] == "":
+            st.error("Please enter an OpenAI API key")
+            st.stop()
+        elif not chat_model:
+            st.error("Please specify a chat model")
+            st.stop()
+        elif st.session_state["query_project"] == "":
+            st.error("Please enter a project")
+            st.stop()
+        elif streamlit_prompt == "":
+            st.error("Please enter a query")
+            st.stop()
+
+        with st.chat_message("user"):
+            st.write(streamlit_prompt)
+        history.add_user_message(streamlit_prompt)
+        
+
+        embedding_function = OpenAIEmbeddings()
+        llm = ChatOpenAI(model = chat_model)
+
+
+        root_dir = f"dbs/{st.session_state["query_project"]}"
+        db_dir = f"{root_dir}/db"
+
+        # check if db exists
+        if not os.path.exists(root_dir):
+            st.error(f"Project does not exist, or is in the incorrect location. Make sure that the project exists and has path `{root_dir}`")
+            st.stop()
+        elif not os.path.exists(db_dir):
+            st.error(f"Database does not exist, or is in the incorrect location. Make sure that the database exists and has path `{db_dir}`")
+            st.stop()
+
+        answer_path = f"{root_dir}/answers/{str(uuid.uuid4())}.md"
+        os.makedirs(f"{root_dir}/answers", exist_ok=True)
+
+        db, docstore = load_db(db_dir, embedding_function)
+
+        answer, sources = query_chatbot_input(streamlit_prompt, db, docstore, llm)
+
+        with st.chat_message("assistant", avatar=AI_AVATAR):
+            st.write(answer)
+        history.add_ai_message(answer)
+
+        with st.expander("See sources"):
+            for s in set(sources):
+                st.write(f"- {s}")
+
+
+def query_chatbot_input(query, db, docstore, llm):
+
+    # get relevant summaries
+    query_docs = db.similarity_search(query)
+
+    # get original documents
+    source_docs = []
+    for doc in query_docs:
+        source_docs.append(docstore[doc.metadata['doc_id']])
+
+    prompt = "You are an assistant for generating input files for gprMax. Use the following pieces of retrieved context to generate an input file for the question. If you don't know the answer, just say that you don't know.\
+    Question: {question}\
+    Context: {context}\
+    Answer:"
+
+    context = " ".join([doc.page_content for doc in source_docs])
+
+
+    prompt_template = PromptTemplate.from_template(prompt)
+
+
+    messages = [
+        SystemMessage(
+            content = "Write the gprMax input file for this"
+        ),
+        HumanMessage(
+            content = prompt_template.format(question = query, context = context)
+        )
+    ]
+
+    # print(f"DEBUG: {messages}")
+
+    chain = (llm | StrOutputParser())
+
+    answer = chain.invoke(messages)
+
+    sources = [doc.metadata['source'] for doc in source_docs]
+
+    return answer, sources
+    
 
 history = StreamlitChatMessageHistory(key = "chat_messages")
