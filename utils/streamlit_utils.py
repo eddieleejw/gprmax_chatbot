@@ -604,6 +604,9 @@ def input_func():
 
         answer, sources = query_chatbot_input(streamlit_prompt, db, docstore, llm)
 
+        # reformat "answer" to have spaces before each "#" delimiter
+        answer = answer.replace("#", "\n#")
+
         with st.chat_message("assistant", avatar=AI_AVATAR):
             st.write(answer)
         history.add_ai_message(answer)
