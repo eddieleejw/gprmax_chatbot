@@ -547,7 +547,7 @@ def input_func():
     # os.environ["OPENAI_API_KEY"] = st.session_state["openai_api_key"]
     # st.session_state["project"] = st.text_input("Project here")
 
-    chat_model = "ft:gpt-4o-mini-2024-07-18:personal::A3Xj55I8"
+    chat_model = "ft:gpt-4o-mini-2024-07-18:personal::AImoep8t"
 
     st.session_state["query_project"] = "af6c69d5"
 
