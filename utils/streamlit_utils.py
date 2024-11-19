@@ -549,7 +549,7 @@ def input_func():
 
     chat_model = "ft:gpt-4o-mini-2024-07-18:personal::AImoep8t"
 
-    st.session_state["query_project"] = "af6c69d5"
+    st.session_state["query_project"] = "input_files"
 
     for msg in history.messages:
         avatar = AI_AVATAR if msg.type == "ai" else None
@@ -611,9 +611,9 @@ def input_func():
             st.write(answer)
         history.add_ai_message(answer)
 
-        with st.expander("See sources"):
-            for s in set(sources):
-                st.write(f"- {s}")
+        # with st.expander("See sources"):
+        #     for s in set(sources):
+        #         st.write(f"- {s}")
 
 
 def query_chatbot_input(query, db, docstore, llm):
